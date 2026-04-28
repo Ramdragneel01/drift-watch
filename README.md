@@ -9,6 +9,10 @@ Production-grade feature and concept drift observatory for ML systems.
 - React dashboard for fast triage
 - Docker and GitHub Actions pipelines for deployment
 
+## UI Preview
+
+![drift-watch dashboard overview](docs/assets/dashboard-overview.png)
+
 ## Why This Exists
 
 Most teams discover drift only after business impact appears. `drift-watch` is designed for early detection with explicit scoring and reproducible checks.
