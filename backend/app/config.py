@@ -33,6 +33,7 @@ class Settings:
     max_payload_bytes: int
     gzip_minimum_size: int
     enable_hsts: bool
+    api_key: str
     port: int
 
 
@@ -50,6 +51,7 @@ def load_settings() -> Settings:
     max_payload_bytes = int(os.getenv("DRIFT_MAX_PAYLOAD_BYTES", "10485760"))
     gzip_minimum_size = int(os.getenv("DRIFT_GZIP_MINIMUM_SIZE", "1024"))
     enable_hsts = _parse_bool(os.getenv("DRIFT_ENABLE_HSTS"), default=False)
+    api_key = os.getenv("DRIFT_API_KEY", "").strip()
     port = int(os.getenv("DRIFT_PORT", "8000"))
 
     return Settings(
@@ -59,5 +61,6 @@ def load_settings() -> Settings:
         max_payload_bytes=max_payload_bytes,
         gzip_minimum_size=gzip_minimum_size,
         enable_hsts=enable_hsts,
+        api_key=api_key,
         port=port,
     )
