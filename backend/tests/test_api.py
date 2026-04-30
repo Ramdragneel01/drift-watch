@@ -6,6 +6,7 @@ from dataclasses import replace
 from fastapi.testclient import TestClient
 
 from app import main as main_module
+from app.middleware import SimpleRateLimitMiddleware
 from app.main import app
 
 
@@ -47,6 +48,16 @@ def _build_rows(offset: int, length: int) -> list[dict[str, object]]:
     return rows
 
 
+def _get_rate_limiter() -> SimpleRateLimitMiddleware:
+    """Resolve the installed rate limiter middleware instance from app stack."""
+    current = app.middleware_stack
+    while hasattr(current, "app"):
+        if isinstance(current, SimpleRateLimitMiddleware):
+            return current
+        current = current.app
+    raise RuntimeError("SimpleRateLimitMiddleware not found")
+
+
 def test_health_endpoint() -> None:
     """Ensure liveness endpoint responds successfully."""
     response = client.get("/health")
@@ -59,6 +70,17 @@ def test_ready_endpoint() -> None:
     response = client.get("/ready")
     assert response.status_code == 200
     assert response.json()["status"] == "ready"
+
+
+def test_probe_alias_endpoints() -> None:
+    """Ensure compatibility probe aliases return expected statuses."""
+    health_alias = client.get("/healthz")
+    assert health_alias.status_code == 200
+    assert health_alias.json()["status"] == "ok"
+
+    ready_alias = client.get("/readyz")
+    assert ready_alias.status_code == 200
+    assert ready_alias.json()["status"] == "ready"
 
 
 def test_feature_drift_evaluation_success() -> None:
@@ -107,6 +129,21 @@ def test_feature_drift_invalid_feature_name() -> None:
         expected_message="request_validation_failed",
         expect_details=True,
     )
+
+
+def test_validation_errors_include_request_and_security_headers() -> None:
+    """Return request tracing and security headers even on validation failures."""
+    payload = {
+        "schema_name": "header-contract",
+        "reference_rows": _build_rows(offset=0, length=40),
+        "current_rows": _build_rows(offset=1000, length=40),
+    }
+
+    response = client.post("/api/v1/drift/evaluate", json=payload)
+    assert response.status_code == 422
+    assert response.headers.get("X-Request-ID")
+    assert response.headers.get("X-Content-Type-Options") == "nosniff"
+    assert response.headers.get("X-Frame-Options") == "DENY"
 
 
 def test_concept_drift_numeric_success() -> None:
@@ -187,3 +224,37 @@ def test_phase1_error_contract_response() -> None:
 
     response = client.post("/api/v1/drift/concept", json=payload)
     _assert_error_contract(response, expected_status=400, expected_code="bad_request")
+
+
+def test_rate_limit_enforcement_contract() -> None:
+    """Reject excess traffic with normalized 429 payloads and trace headers."""
+    limiter = _get_rate_limiter()
+    previous_limit = limiter.max_requests_per_minute
+
+    try:
+        limiter.max_requests_per_minute = 1
+        limiter.request_log.clear()
+
+        payload = {
+            "schema_name": "rate-limit",
+            "features": [{"name": "income", "kind": "numeric", "bins": 10, "alert_threshold": 0.1}],
+            "reference_rows": _build_rows(offset=0, length=40),
+            "current_rows": _build_rows(offset=5000, length=40),
+        }
+
+        first = client.post("/api/v1/drift/evaluate", json=payload)
+        assert first.status_code == 200
+
+        second = client.post("/api/v1/drift/evaluate", json=payload)
+        _assert_error_contract(
+            second,
+            expected_status=429,
+            expected_code="rate_limited",
+            expected_message="rate_limited",
+        )
+        assert second.headers.get("X-Request-ID")
+        assert second.headers.get("X-Content-Type-Options") == "nosniff"
+        assert second.headers.get("X-Frame-Options") == "DENY"
+    finally:
+        limiter.max_requests_per_minute = previous_limit
+        limiter.request_log.clear()

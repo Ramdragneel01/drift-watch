@@ -10,7 +10,12 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.config import load_settings
-from app.middleware import PayloadSizeLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
+from app.middleware import (
+    PayloadSizeLimitMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+    SimpleRateLimitMiddleware,
+)
 from app.models import (
     ConceptDriftRequest,
     ConceptDriftResponse,
@@ -99,13 +104,18 @@ app = FastAPI(
     dependencies=[Depends(_require_api_key)],
 )
 
-app.add_middleware(RequestContextMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
 app.add_middleware(PayloadSizeLimitMiddleware, max_payload_bytes=settings.max_payload_bytes)
+app.add_middleware(
+    SimpleRateLimitMiddleware,
+    max_requests_per_minute=settings.rate_limit_per_minute,
+    exempt_paths=AUTH_EXEMPT_PATHS,
+)
 app.add_middleware(
     SecurityHeadersMiddleware,
     enable_hsts=settings.enable_hsts and settings.app_env == "production",
 )
+app.add_middleware(RequestContextMiddleware)
 
 if settings.allowed_hosts:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)

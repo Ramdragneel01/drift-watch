@@ -22,6 +22,26 @@ Response:
 { "status": "ready" }
 ```
 
+## GET /healthz
+
+Compatibility alias for `/health`.
+
+Response:
+
+```json
+{ "status": "ok" }
+```
+
+## GET /readyz
+
+Compatibility alias for `/ready`.
+
+Response:
+
+```json
+{ "status": "ready" }
+```
+
 ## POST /api/v1/drift/evaluate
 
 Evaluate feature drift from reference and current windows.
@@ -99,3 +119,24 @@ Response body:
   ]
 }
 ```
+
+## Error Contract
+
+All API errors are returned in a normalized envelope:
+
+```json
+{
+  "error": {
+    "code": "rate_limited",
+    "message": "rate_limited",
+    "request_id": "f6aafcd2-25f2-4f5e-b0f6-c7446199758f"
+  }
+}
+```
+
+Common status codes:
+
+- `400` bad request.
+- `413` payload too large.
+- `422` validation error.
+- `429` rate limited.

@@ -23,6 +23,17 @@ def _parse_bool(raw_value: str, default: bool) -> bool:
     return default
 
 
+def _parse_int(raw_value: str | None, default: int, min_value: int) -> int:
+    """Parse constrained integer settings from environment values."""
+    if raw_value is None:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return max(min_value, parsed)
+
+
 @dataclass(frozen=True)
 class Settings:
     """Application settings loaded from environment variables."""
@@ -34,6 +45,7 @@ class Settings:
     gzip_minimum_size: int
     enable_hsts: bool
     api_key: str
+    rate_limit_per_minute: int
     port: int
 
 
@@ -48,11 +60,24 @@ def load_settings() -> Settings:
         os.getenv("DRIFT_CORS_ORIGINS", "http://localhost:8080,http://127.0.0.1:8080")
     )
 
-    max_payload_bytes = int(os.getenv("DRIFT_MAX_PAYLOAD_BYTES", "10485760"))
-    gzip_minimum_size = int(os.getenv("DRIFT_GZIP_MINIMUM_SIZE", "1024"))
+    max_payload_bytes = _parse_int(
+        os.getenv("DRIFT_MAX_PAYLOAD_BYTES"),
+        default=10_485_760,
+        min_value=1_048_576,
+    )
+    gzip_minimum_size = _parse_int(
+        os.getenv("DRIFT_GZIP_MINIMUM_SIZE"),
+        default=1024,
+        min_value=256,
+    )
     enable_hsts = _parse_bool(os.getenv("DRIFT_ENABLE_HSTS"), default=False)
     api_key = os.getenv("DRIFT_API_KEY", "").strip()
-    port = int(os.getenv("DRIFT_PORT", "8000"))
+    rate_limit_per_minute = _parse_int(
+        os.getenv("DRIFT_RATE_LIMIT_PER_MINUTE"),
+        default=180,
+        min_value=10,
+    )
+    port = _parse_int(os.getenv("DRIFT_PORT"), default=8000, min_value=1)
 
     return Settings(
         app_env=app_env,
@@ -62,5 +87,6 @@ def load_settings() -> Settings:
         gzip_minimum_size=gzip_minimum_size,
         enable_hsts=enable_hsts,
         api_key=api_key,
+        rate_limit_per_minute=rate_limit_per_minute,
         port=port,
     )

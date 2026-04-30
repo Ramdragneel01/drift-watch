@@ -4,6 +4,8 @@
 
 - Liveness: `GET /health`
 - Readiness: `GET /ready`
+- Liveness alias: `GET /healthz`
+- Readiness alias: `GET /readyz`
 
 ## Recommended Alerts
 
@@ -11,6 +13,7 @@
 2. Readiness endpoint non-ready status
 3. High drift ratio (drifted_features / total_features >= 0.4) sustained for N runs
 4. Request failure rate > 2% over 5 minutes
+5. `429` rate-limited responses spike above normal baseline
 
 ## Incident Response Playbook
 
