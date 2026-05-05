@@ -22,3 +22,18 @@ Describe what changed and why.
 ## Future Follow-Ups
 
 List any improvements intentionally deferred.
+
+
+## What changed
+-
+
+## Why this change
+-
+
+## Validation
+- [ ] Local checks passed
+- [ ] Tests added or updated when behavior changed
+
+## Risk and rollout
+- Risk level:
+- Rollback plan:
